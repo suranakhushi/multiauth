@@ -1,0 +1,149 @@
+{% extends '../base.html' %}
+{% block title %}Register{% endblock %}
+{% block content %}
+
+<section class="bg-white dark:bg-gray-900">
+  <div class="py-8 px-4 mx-auto max-w-2xl lg:py-8">
+
+    {% if form.errors %}
+      {% for key, value in form.errors.items %}
+        <div id="alert-2" class="flex p-4 mb-4 text-red-800 rounded-lg bg-red-50 dark:bg-gray-800 dark:text-red-400" role="alert">
+          <svg aria-hidden="true" class="flex-shrink-0 w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+          </svg>
+          <div class="ml-3 text-sm font-medium">{{ value }}</div>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% include "components/messages.html" %}
+
+    <h2 class="mb-10 text-3xl font-bold text-primary-800 dark:text-white">
+      Create New Account:
+    </h2>
+
+    <form method="POST" enctype="multipart/form-data" action="{% url 'accounts:register' %}">
+      {% csrf_token %}
+      <div class="grid gap-4 sm:grid-cols-2 sm:gap-4">
+        <div class="w-full">
+          <label class="block mb-1 text-sm font-medium text-gray-900 dark:text-white">First Name</label>
+          {{ form.first_name }}
+        </div>
+        <div class="w-full">
+          <label class="block mb-1 text-sm font-medium text-gray-900 dark:text-white">Last Name</label>
+          {{ form.last_name }}
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block mb-1 text-sm font-medium text-gray-900 dark:text-white">Username</label>
+          {{ form.username }}
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block mb-1 text-sm font-medium text-gray-900 dark:text-white">Email</label>
+          {{ form.email }}
+        </div>
+        <div>
+          <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Password</label>
+          {{ form.password1 }}
+        </div>
+        <div>
+          <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Confirm Password</label>
+          {{ form.password2 }}
+        </div>
+        <div class="w-full">
+          <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Phone Number</label>
+          {{ form.phone_number }}
+        </div>
+        <div>
+          <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Gender</label>
+          {{ form.gender }}
+        </div>
+      </div>
+
+      <!-- Webcam Capture Section -->
+      <div class="mt-10 text-center">
+        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Capture Your Face</h3>
+
+        <!-- Live camera -->
+        <video id="camera" width="320" height="240" autoplay playsinline muted
+               class="mx-auto rounded-lg shadow border border-gray-300"></video>
+
+        <!-- Hidden canvas -->
+        <canvas id="snapshot" width="320" height="240" style="display:none;"></canvas>
+
+        <!-- Image preview -->
+        <img id="preview" alt="" class="mx-auto mt-3 rounded shadow"
+             style="display:none;width:160px;height:auto;" />
+
+        <!-- Hidden input with Base64 data -->
+        <input type="hidden" name="captured_image" id="capturedImageInput" />
+
+        <!-- Capture button -->
+        <div class="mt-3">
+          <button type="button" id="captureBtn"
+            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+            Capture Face
+          </button>
+        </div>
+
+        <p class="text-xs text-gray-500 mt-2">After capturing, click Register.</p>
+      </div>
+
+      <div class="w-full text-center">
+        <button type="submit" id="registerSubmit"
+          class="text-white bg-gradient-to-br from-purple-600 to-blue-500 hover:bg-gradient-to-bl
+                 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800
+                 font-medium rounded-lg text-sm px-5 py-2.5 text-center mr-2 mb-2 mt-8 w-2/4">
+          Register
+        </button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- JavaScript for webcam capture -->
+<script>
+const video = document.getElementById('camera');
+const canvas = document.getElementById('snapshot');
+const ctx = canvas.getContext('2d');
+const captureBtn = document.getElementById('captureBtn');
+const capturedImageInput = document.getElementById('capturedImageInput');
+const preview = document.getElementById('preview');
+
+// Open webcam
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    video.srcObject = stream;
+    console.log('[register] Camera stream acquired');
+  })
+  .catch(err => {
+    alert('Unable to access camera: ' + err.message);
+    console.error('[register] getUserMedia error:', err);
+  });
+
+// Capture image → Base64 + preview
+captureBtn.addEventListener('click', () => {
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const imageData = canvas.toDataURL('image/png');
+  capturedImageInput.value = imageData;
+  console.log('[register] captured length:', imageData ? imageData.length : 0);
+
+  if (imageData && imageData.startsWith('data:image/png;base64,')) {
+    preview.src = imageData;
+    preview.style.display = 'block';
+    alert('✅ Face captured successfully!');
+  } else {
+    alert('⚠️ Failed to capture. Try again.');
+  }
+});
+
+// Prevent submit if no image captured
+document.querySelector('form').addEventListener('submit', (e) => {
+  if (!capturedImageInput.value || !capturedImageInput.value.startsWith('data:image/')) {
+    e.preventDefault();
+    alert('Please capture your face before submitting.');
+    console.warn('[register] blocked submit: no captured image');
+  }
+});
+</script>
+
+{% endblock %}

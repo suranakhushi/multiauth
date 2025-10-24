@@ -13,9 +13,19 @@ import cv2
 import base64
 import numpy as np
 import os
+from django.db.models import Sum
+from accounts.models import Transaction
 from django.shortcuts import get_object_or_404
 from .forms import OTPForm 
 from django.contrib.auth.hashers import check_password
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from accounts.models import Transaction
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.http import JsonResponse
 User = get_user_model()
 faceRecognition = FaceRecognition()
 
@@ -151,7 +161,9 @@ def accounts_verify_otp(request):
             user = get_object_or_404(User, id=user_id)
             login(request, user)
             messages.success(request, f"✅ Welcome back, {user.username}!")
-            return redirect("accounts:home")
+            return redirect("accounts:dashboard")
+  # 🔹 redirect to dashboard
+
         else:
             messages.error(request, "❌ Invalid OTP.")
             return redirect("accounts:verify_otp")
@@ -270,3 +282,93 @@ def accounts_home(request):
 def accounts_logout(request):
     logout(request)
     return redirect("accounts:login")
+@login_required
+def dashboard(request):
+    transactions = Transaction.objects.filter(user=request.user).order_by('-created_at')[:10]
+    total_credit = sum(t.amount for t in transactions if t.transaction_type == "credit")
+    total_debit = sum(t.amount for t in transactions if t.transaction_type == "debit")
+    balance = total_credit - total_debit
+
+    context = {
+        'transactions': transactions,
+        'total_credit': total_credit,
+        'total_debit': total_debit,
+        'balance': balance,
+    }
+    return render(request, 'accounts/dashboard.html', context)
+@login_required
+def transfers_view(request):
+    transactions = Transaction.objects.filter(user=request.user).order_by('-created_at')
+    return render(request, "accounts/transfers.html", {"transactions": transactions})
+
+@login_required
+def cards_view(request):
+    return render(request, "accounts/cards.html")
+
+@login_required
+def settings_view(request):
+    return render(request, "accounts/settings.html")
+@login_required
+@require_http_methods(["GET", "POST"])
+def new_transfer(request):
+    """
+    Allows the logged-in user to create a new credit or debit transaction.
+    """
+    if request.method == "POST":
+        amount = request.POST.get("amount")
+        description = request.POST.get("description")
+        transaction_type = request.POST.get("transaction_type")
+
+        # Validate
+        if not amount or float(amount) <= 0:
+            messages.error(request, "Invalid amount.")
+            return redirect("accounts:dashboard")
+
+        # Create transaction
+        Transaction.objects.create(
+            user=request.user,
+            amount=amount,
+            description=description,
+            transaction_type=transaction_type,
+            status="Completed"
+        )
+
+        messages.success(request, f"{transaction_type.title()} of ₹{amount} added successfully!")
+        return redirect("accounts:dashboard")
+
+    return render(request, "accounts/transfers.html")
+@login_required
+def reverify_face(request):
+    """
+    Re-runs face recognition every few seconds while the user is active on dashboard.
+    Returns { status: 'valid' } if same person, else 'invalid'.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request"}, status=400)
+
+    face_base64 = request.POST.get("captured_image")
+    if not face_base64:
+        return JsonResponse({"error": "No image captured"}, status=400)
+
+    try:
+        # Decode base64 → image
+        _, imgstr = face_base64.split(';base64,')
+        img_data = base64.b64decode(imgstr)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        # Predict via ML model
+        face_id, confidence = faceRecognition.predict_from_image(img)
+        threshold = 85  # same as your login threshold
+
+        if face_id == request.user.id and confidence < threshold:
+            return JsonResponse({"status": "valid", "confidence": confidence})
+        else:
+            return JsonResponse({
+                "status": "invalid",
+                "confidence": confidence,
+                "detected_id": face_id
+            })
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)

@@ -130,4 +130,18 @@ class NewUser(PermissionsMixin, AbstractBaseUser):
 #     phone_number = models.IntegerField()
 #     status = models.CharField(max_length=6, choices=STATE_CHOICES.choices)
 
-    
+class Transaction(models.Model):
+    TRANSACTION_TYPES = [
+        ("credit", "Credit"),
+        ("debit", "Debit"),
+    ]
+
+    user = models.ForeignKey(NewUser, on_delete=models.CASCADE, related_name="transactions")
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    description = models.CharField(max_length=255)
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+    status = models.CharField(max_length=50, default="Completed")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.description} ({self.amount})"

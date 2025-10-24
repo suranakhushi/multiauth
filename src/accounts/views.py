@@ -10,6 +10,9 @@ from .forms import UserCreationForm
 from .detection import FaceRecognition
 from .tasks import send_email
 import cv2
+from django_otp.plugins.otp_totp.models import TOTPDevice
+import qrcode
+from io import BytesIO
 import base64
 import numpy as np
 import os
@@ -110,89 +113,7 @@ def accounts_register(request):
 def accounts_login_page(request):
     return render(request, "accounts/login.html", {})
 
-def send_otp_to_user(phone_number):
-    """
-    Sends OTP via Twilio if configured,
-    otherwise prints & displays it in the browser (debug mode).
-    """
-    otp = str(random.randint(100000, 999999))
-    cache.set(phone_number, otp, timeout=300)  # store OTP for 5 minutes
 
-    # Try to load Twilio credentials
-    account_sid = config('PHONE_ACCOUNT_SID', default=None)
-    auth_token = config('PHONE_AUTH_TOKEN', default=None)
-    from_number = config('PHONE_FROM', default=None)
-
-    # --- DEBUG MODE ---
-    if not all([account_sid, auth_token, from_number]):
-        print(f"📩 [DEBUG MODE] OTP for {phone_number} is {otp}")
-        # store for flash message (so we can show it once)
-        cache.set(f"debug_otp_{phone_number}", otp, timeout=60)
-        return otp
-
-    # --- TWILIO MODE ---
-    try:
-        from twilio.rest import Client
-        client = Client(account_sid, auth_token)
-        client.messages.create(
-            body=f"Your OTP is {otp}",
-            from_=from_number,
-            to=f"+91{phone_number}"
-        )
-        print(f"✅ OTP sent to +91{phone_number}")
-    except Exception as e:
-        print(f"⚠️ Twilio OTP error: {e}\nFallback → OTP is {otp}")
-        cache.set(f"debug_otp_{phone_number}", otp, timeout=60)
-    return otp
-
-def accounts_verify_otp(request):
-    form = OTPForm(request.POST or None)
-    phone = request.session.get("phone_number")
-    user_id = request.session.get("pending_user_id")
-
-    if not phone or not user_id:
-        messages.error(request, "Session expired. Please login again.")
-        return redirect("accounts:login")
-
-    if request.method == "POST" and form.is_valid():
-        entered_otp = form.cleaned_data['otp']
-        real_otp = cache.get(phone)
-        if entered_otp == real_otp:
-            user = get_object_or_404(User, id=user_id)
-            login(request, user)
-            messages.success(request, f"✅ Welcome back, {user.username}!")
-            return redirect("accounts:dashboard")
-  # 🔹 redirect to dashboard
-
-        else:
-            messages.error(request, "❌ Invalid OTP.")
-            return redirect("accounts:verify_otp")
-
-    return render(request, "accounts/otp_verify.html", {"form": form})
-
-def accounts_verify_password(request):
-    user_id = request.session.get("pending_user_id")
-    if not user_id:
-        messages.error(request, "Session expired. Please login again.")
-        return redirect("accounts:login")
-
-    user = get_object_or_404(User, id=user_id)
-
-    if request.method == "POST":
-        password = request.POST.get("password")
-        if check_password(password, user.password):
-            # Password correct → move to OTP
-            request.session["phone_number"] = user.phone_number
-            send_otp_to_user(user.phone_number)
-            messages.info(
-                request, f"📩 OTP sent to your registered mobile number ending with {str(user.phone_number)[-4:]}"
-            )
-            return redirect("accounts:verify_otp")
-        else:
-            messages.error(request, "❌ Incorrect password.")
-            return redirect("accounts:verify_password")
-
-    return render(request, "accounts/verify_password.html", {"user": user})
 
 def accounts_login(request):
     if request.method == "POST":
@@ -251,7 +172,7 @@ def accounts_login(request):
 from .forms import PasswordForm, OTPForm
 
 def accounts_verify_password(request):
-    """Step 2: Verify password before sending OTP."""
+    """Step 2: Verify password, then go to TOTP verification."""
     user_id = request.session.get("pending_user_id")
 
     if not user_id:
@@ -259,21 +180,25 @@ def accounts_verify_password(request):
         return redirect("accounts:login")
 
     user = get_object_or_404(User, id=user_id)
-    form = PasswordForm(request.POST or None)
 
-    if request.method == "POST" and form.is_valid():
-        password = form.cleaned_data["password"]
-        if user.check_password(password):
-            # ✅ Password correct → send OTP next
-            request.session["phone_number"] = user.phone_number
-            send_otp_to_user(user.phone_number)
-            messages.info(request, "📩 OTP has been sent to your phone.")
-            return redirect("accounts:verify_otp")
+    if request.method == "POST":
+        password = request.POST.get("password")
+        if check_password(password, user.password):
+            # ✅ Password correct → login user
+            login(request, user)
+            # If TOTP exists, go to verification
+            if TOTPDevice.objects.filter(user=user, confirmed=True).exists():
+                messages.info(request, "🔐 Please enter your 6-digit authenticator code.")
+                return redirect("accounts:verify_totp")
+            # Otherwise, set up TOTP
+            messages.info(request, "📱 Set up Google Authenticator.")
+            return redirect("accounts:setup_totp")
         else:
             messages.error(request, "❌ Incorrect password.")
             return redirect("accounts:verify_password")
 
-    return render(request, "accounts/password_verify.html", {"form": form, "user": user})
+    return render(request, "accounts/verify_password.html", {"user": user})
+
 
 def accounts_home(request):
     context = {}
@@ -372,3 +297,55 @@ def reverify_face(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+# ---------------- TOTP Setup ----------------
+@login_required
+def setup_totp(request):
+    """Generate and display a TOTP QR code for Google Authenticator."""
+    user = request.user
+    # Check if already has a TOTP device
+    existing_device = TOTPDevice.objects.filter(user=user, confirmed=True).first()
+    if existing_device:
+        messages.info(request, "✅ TOTP already configured.")
+        return redirect("accounts:verify_totp")
+
+    # Create unconfirmed device
+    device = TOTPDevice.objects.create(user=user, confirmed=False)
+
+    # Generate provisioning URI (Google Authenticator QR)
+    uri = device.config_url
+
+    # Create QR code
+    qr = qrcode.make(uri)
+    buffer = BytesIO()
+    qr.save(buffer, format='PNG')
+    qr_b64 = base64.b64encode(buffer.getvalue()).decode()
+
+    return render(request, "accounts/setup_totp.html", {
+        "qr_code": qr_b64,
+        "uri": uri
+    })
+
+
+# ---------------- TOTP Verification ----------------
+@login_required
+def verify_totp(request):
+    """Verify user’s TOTP code from their authenticator app."""
+    user = request.user
+    device = TOTPDevice.objects.filter(user=user, confirmed=False).first() \
+        or TOTPDevice.objects.filter(user=user, confirmed=True).first()
+
+    if not device:
+        messages.error(request, "No TOTP device found. Please set up first.")
+        return redirect("accounts:setup_totp")
+
+    if request.method == "POST":
+        token = request.POST.get("token")
+        if device.verify_token(token):
+            device.confirmed = True
+            device.save()
+            messages.success(request, "🎉 Two-factor authentication enabled successfully!")
+            return redirect("accounts:dashboard")
+        else:
+            messages.error(request, "❌ Invalid code, please try again.")
+
+    return render(request, "accounts/verify_totp.html")

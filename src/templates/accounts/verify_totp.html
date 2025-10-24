@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Verify TOTP{% endblock %}
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+  <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-8 text-center max-w-md w-full">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Verify Authentication Code</h1>
+    <form method="POST">
+      {% csrf_token %}
+      <input type="text" name="token" maxlength="6" required
+             placeholder="Enter 6-digit code"
+             class="w-full p-3 mb-4 border rounded-lg focus:ring focus:ring-blue-300 dark:bg-gray-700 dark:text-white">
+      <button type="submit"
+              class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+        Verify Code
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

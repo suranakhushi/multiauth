@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Setup Two-Factor Authentication{% endblock %}
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+  <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-8 text-center max-w-md w-full">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Enable Two-Factor Authentication</h1>
+    <p class="text-gray-600 dark:text-gray-300 mb-6">
+      Scan this QR code in <b>Google Authenticator</b> or <b>Authy</b>, then enter the 6-digit code below.
+    </p>
+    <img src="data:image/png;base64,{{ qr_code }}" alt="TOTP QR" class="mx-auto mb-6 w-48 h-48 shadow-lg rounded-lg border">
+    <a href="{% url 'accounts:verify_totp' %}" class="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+      Continue to Verify
+    </a>
+  </div>
+</div>
+{% endblock %}

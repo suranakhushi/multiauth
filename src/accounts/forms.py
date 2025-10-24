@@ -99,3 +99,17 @@ class RegisterForm(forms.ModelForm):
     class Meta:
         model = NewUser
         fields = ('email', 'username', 'first_name', 'last_name')
+class OTPForm(forms.Form):
+    otp = forms.CharField(
+        label="Enter OTP",
+        max_length=6,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Enter 6-digit code",
+            "class": "border rounded p-2 w-full"
+        })
+    )        
+class PasswordForm(forms.Form):
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Enter your password'}),
+        label="Password"
+    )

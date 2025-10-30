@@ -1,19 +1,46 @@
-{% extends "base.html" %}
-{% block title %}Verify TOTP{% endblock %}
-{% block content %}
-<div class="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-  <div class="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-8 text-center max-w-md w-full">
-    <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-white">Verify Authentication Code</h1>
-    <form method="POST">
-      {% csrf_token %}
-      <input type="text" name="token" maxlength="6" required
-             placeholder="Enter 6-digit code"
-             class="w-full p-3 mb-4 border rounded-lg focus:ring focus:ring-blue-300 dark:bg-gray-700 dark:text-white">
-      <button type="submit"
-              class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
-        Verify Code
-      </button>
-    </form>
-  </div>
-</div>
-{% endblock %}
+from django_otp.plugins.otp_totp.models import TOTPDevice
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.contrib import messages
+from django.shortcuts import render, redirect
+
+@login_required
+def verify_totp(request):
+    """Verify user's TOTP code from their authenticator app (AJAX + fallback)."""
+    user = request.user
+
+    # Find existing TOTP device (either unconfirmed or confirmed)
+    device = (
+        TOTPDevice.objects.filter(user=user, confirmed=False).first()
+        or TOTPDevice.objects.filter(user=user, confirmed=True).first()
+    )
+
+    if not device:
+        # No device set up → redirect to setup
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "No TOTP device found. Please set up first."}, status=400)
+        messages.error(request, "No TOTP device found. Please set up first.")
+        return redirect("accounts:setup_totp")
+
+    # --- POST: user submitting 6-digit token ---
+    if request.method == "POST":
+        token = request.POST.get("token", "").strip()
+
+        if device.verify_token(token):
+            device.confirmed = True
+            device.save()
+
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True})  # ✅ handled by JS in auth_flow.html
+
+            messages.success(request, "🎉 Two-factor authentication verified successfully!")
+            return redirect("accounts:dashboard")
+
+        else:
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": "Invalid or expired code. Try again."}, status=400)
+
+            messages.error(request, "❌ Invalid or expired code. Please try again.")
+
+    # --- GET: render fallback HTML form ---
+    return render(request, "accounts/verify_totp.html")

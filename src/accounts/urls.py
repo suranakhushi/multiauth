@@ -19,4 +19,7 @@ urlpatterns = [
      path('reverify_face/', views.reverify_face, name='reverify_face'),
     path('setup_totp/', views.setup_totp, name='setup_totp'),
     path('verify_totp/', views.verify_totp, name='verify_totp'),
+    path('auth/', views.auth_flow, name='auth_flow'),
+
+
 ]

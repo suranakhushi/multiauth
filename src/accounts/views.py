@@ -109,95 +109,102 @@ def accounts_register(request):
 
     return render(request, "accounts/register.html", {"form": form})
 
-
 def accounts_login_page(request):
-    return render(request, "accounts/login.html", {})
+    """Redirect users to the unified auth flow instead of old login."""
+    return redirect("accounts:auth_flow")
 
+
+def auth_flow(request):
+    """
+    Renders the unified authentication (multi-step face → password → TOTP) flow.
+    """
+    return render(request, "accounts/auth_flow.html")
 
 
 def accounts_login(request):
+    """Step 1: Face recognition for MFA flow (supports AJAX + fallback)."""
+    print("🟡 [accounts_login] Request received:", request.method)
+    print("🟡 Headers:", dict(request.headers))
+    print("🟡 Is AJAX:", request.headers.get("x-requested-with"))
+
     if request.method == "POST":
         face_base64 = request.POST.get("captured_image")
+        print("🟡 Face data present:", bool(face_base64))
 
-        # 🧩 No face captured
         if not face_base64:
-            messages.error(request, "⚠️ Please capture your face to continue.")
+            msg = "No face image received."
+            print("❌", msg)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return redirect("accounts:login")
 
         try:
-            # Decode Base64 to OpenCV image
-            _, imgstr = face_base64.split(';base64,')
+            _, imgstr = face_base64.split(";base64,")
             img_data = base64.b64decode(imgstr)
             nparr = np.frombuffer(img_data, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            print("✅ Image decoded successfully")
         except Exception as e:
-            messages.error(request, f"⚠️ Error decoding image: {e}")
+            err = f"Error decoding image: {e}"
+            print("❌", err)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": err}, status=400)
+            messages.error(request, err)
             return redirect("accounts:login")
 
-        # 🧩 Predict face
+        # Predict face
         face_id, confidence = faceRecognition.predict_from_image(img)
         print(f"🔍 Face Prediction → ID={face_id}, Confidence={confidence}")
 
-        # Case 1: No face detected
         if face_id is None:
-            messages.error(request, "⚠️ No valid face detected. Try again.")
+            msg = "No valid face detected. Try again."
+            print("❌", msg)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return redirect("accounts:login")
 
-        # Case 2: Face recognized but above threshold (low match)
         threshold = 85
         if confidence > threshold:
-            messages.error(request, "❌ Face not recognized. Please register as a new user.")
+            msg = f"Face not recognized (conf={confidence})."
+            print("❌", msg)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
             return redirect("accounts:register")
 
-        # Case 3: Face recognized successfully
+        # Found valid face
         try:
             user = get_object_or_404(User, id=face_id)
             print(f"✅ Found user in DB: {user.username} (id={user.id})")
 
-            # Store temporarily before password verification
             request.session["pending_user_id"] = user.id
 
-            # Redirect to password step (added next in flow)
+            # ✅ Respond differently for AJAX vs normal
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                payload = {"ok": True, "next": "password", "user": user.username}
+                print("🟢 Returning JSON:", payload)
+                return JsonResponse(payload)
+
+            print("⚙️ Fallback redirect (non-AJAX)")
             return redirect("accounts:verify_password")
 
         except Exception as e:
-            print(f"❌ Login failed with error: {e}")
-            messages.error(request, f"❌ Error: {e}")
+            err = f"Login failed: {e}"
+            print("❌ Exception in face login:", err)
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": False, "error": err}, status=400)
+            messages.error(request, err)
             return redirect("accounts:register")
 
-    # For GET request → show login camera page
+    # GET fallback
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        print("❌ Invalid AJAX GET request.")
+        return JsonResponse({"ok": False, "error": "Invalid method"}, status=405)
+
+    print("⚙️ Rendering fallback camera page.")
     return render(request, "accounts/login.html")
-
-
-from .forms import PasswordForm, OTPForm
-
-def accounts_verify_password(request):
-    """Step 2: Verify password, then go to TOTP verification."""
-    user_id = request.session.get("pending_user_id")
-
-    if not user_id:
-        messages.error(request, "Session expired. Please login again.")
-        return redirect("accounts:login")
-
-    user = get_object_or_404(User, id=user_id)
-
-    if request.method == "POST":
-        password = request.POST.get("password")
-        if check_password(password, user.password):
-            # ✅ Password correct → login user
-            login(request, user)
-            # If TOTP exists, go to verification
-            if TOTPDevice.objects.filter(user=user, confirmed=True).exists():
-                messages.info(request, "🔐 Please enter your 6-digit authenticator code.")
-                return redirect("accounts:verify_totp")
-            # Otherwise, set up TOTP
-            messages.info(request, "📱 Set up Google Authenticator.")
-            return redirect("accounts:setup_totp")
-        else:
-            messages.error(request, "❌ Incorrect password.")
-            return redirect("accounts:verify_password")
-
-    return render(request, "accounts/verify_password.html", {"user": user})
 
 
 def accounts_home(request):
@@ -206,7 +213,8 @@ def accounts_home(request):
 
 def accounts_logout(request):
     logout(request)
-    return redirect("accounts:login")
+    return redirect("accounts:auth_flow")
+
 @login_required
 def dashboard(request):
     transactions = Transaction.objects.filter(user=request.user).order_by('-created_at')[:10]
@@ -324,18 +332,58 @@ def setup_totp(request):
         "qr_code": qr_b64,
         "uri": uri
     })
+def accounts_verify_password(request):
+    """Step 2: Verify password, then go to TOTP verification."""
+    user_id = request.session.get("pending_user_id")
+    if not user_id:
+        msg = "Session expired. Please login again."
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": msg})
+        messages.error(request, msg)
+        return redirect("accounts:login")
+
+    user = get_object_or_404(User, id=user_id)
+
+    if request.method == "POST":
+        password = request.POST.get("password")
+        if check_password(password, user.password):
+            request.session["password_verified"] = True
+
+            # ✅ AJAX response
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True, "next": "totp"})
+
+            # fallback
+            if TOTPDevice.objects.filter(user=user, confirmed=True).exists():
+                return redirect("accounts:verify_totp")
+            return redirect("accounts:setup_totp")
+
+        # Wrong password
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Incorrect password."})
+        messages.error(request, "❌ Incorrect password.")
+        return redirect("accounts:verify_password")
+
+    return render(request, "accounts/verify_password.html", {"user": user})
 
 
 # ---------------- TOTP Verification ----------------
 @login_required
 def verify_totp(request):
-    """Verify user’s TOTP code from their authenticator app."""
-    user = request.user
-    device = TOTPDevice.objects.filter(user=user, confirmed=False).first() \
-        or TOTPDevice.objects.filter(user=user, confirmed=True).first()
+    """Step 3: Verify TOTP and complete login."""
+    user_id = request.session.get("pending_user_id")
+    user = get_object_or_404(User, id=user_id)
+
+    device = (
+        TOTPDevice.objects.filter(user=user, confirmed=True).first()
+        or TOTPDevice.objects.filter(user=user, confirmed=False).first()
+    )
 
     if not device:
-        messages.error(request, "No TOTP device found. Please set up first.")
+        msg = "No TOTP device found. Please set up first."
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": msg})
+        messages.error(request, msg)
         return redirect("accounts:setup_totp")
 
     if request.method == "POST":
@@ -343,9 +391,21 @@ def verify_totp(request):
         if device.verify_token(token):
             device.confirmed = True
             device.save()
-            messages.success(request, "🎉 Two-factor authentication enabled successfully!")
+
+            # ✅ Now log user in and clean up
+            login(request, user)
+            request.session.pop("pending_user_id", None)
+            request.session.pop("password_verified", None)
+
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"ok": True})
+
+            messages.success(request, "✅ Logged in successfully!")
             return redirect("accounts:dashboard")
-        else:
-            messages.error(request, "❌ Invalid code, please try again.")
+
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"ok": False, "error": "Invalid code."})
+        messages.error(request, "❌ Invalid code, please try again.")
+        return redirect("accounts:verify_totp")
 
     return render(request, "accounts/verify_totp.html")

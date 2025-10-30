@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Secure Multi-Factor Login{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex items-center justify-center py-10">
+  <div class="w-full max-w-4xl bg-white shadow-xl rounded-2xl p-8 overflow-hidden">
+    <h1 class="text-2xl font-bold text-gray-900 text-center">Secure Multi-Factor Login</h1>
+    <p class="text-center text-gray-500 mt-1">Face → Password → TOTP</p>
+
+    <!-- Progress Bar -->
+    <div class="relative mt-8">
+      <div class="absolute left-10 right-10 top-5 h-0.5 bg-gray-200"></div>
+      <div class="grid grid-cols-3 text-center relative">
+        <div class="flex flex-col items-center">
+          <div id="dot-face"
+               class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-600 text-white font-semibold shadow">
+            1
+          </div>
+          <p class="mt-2 text-sm font-medium text-gray-700">Face</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <div id="dot-pass"
+               class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-200 text-gray-600 font-semibold">
+            2
+          </div>
+          <p class="mt-2 text-sm font-medium text-gray-700">Password</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <div id="dot-totp"
+               class="w-10 h-10 rounded-full flex items-center justify-center bg-gray-200 text-gray-600 font-semibold">
+            3
+          </div>
+          <p class="mt-2 text-sm font-medium text-gray-700">TOTP</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message Box -->
+    <div id="msg" class="hidden mt-6 rounded-lg px-4 py-3 text-sm font-medium"></div>
+
+    <!-- Sliding Panels -->
+    <div class="relative mt-8 overflow-hidden">
+      <div id="slides" class="flex transition-transform duration-500 ease-out" style="width:300%;">
+        
+        <!-- Step 1: Face -->
+        <section class="w-full px-4">
+          <div class="grid md:grid-cols-2 gap-6 items-center">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Step 1 — Face Verification</h2>
+              <p class="text-gray-500 mt-1">
+                Capture a snapshot via your camera and verify it against your registered face.
+              </p>
+              <button id="btn-face"
+                class="mt-4 px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition">
+                Capture & Verify
+              </button>
+              <p class="text-xs text-gray-400 mt-2">
+                Your image is processed securely and not stored after verification.
+              </p>
+            </div>
+            <div>
+              <video id="live" autoplay playsinline muted
+                     class="w-full aspect-video rounded-xl border border-gray-200 bg-black/5"></video>
+            </div>
+          </div>
+        </section>
+
+        <!-- Step 2: Password -->
+        <section class="w-full px-4">
+          <h2 class="text-lg font-semibold text-gray-900">Step 2 — Password Verification</h2>
+          <p class="text-gray-500 mt-1">Enter your account password to proceed.</p>
+          <div class="mt-4 max-w-md">
+            <input id="password" type="password" placeholder="Enter password"
+                   class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+            <button id="btn-pass"
+              class="mt-3 px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition">
+              Verify Password
+            </button>
+          </div>
+        </section>
+
+        <!-- Step 3: TOTP -->
+        <section class="w-full px-4">
+          <h2 class="text-lg font-semibold text-gray-900">Step 3 — Authenticator Code</h2>
+          <p class="text-gray-500 mt-1">Enter the 6-digit code from your authenticator app.</p>
+          <div class="mt-4 max-w-md">
+            <input id="totp" type="text" maxlength="6" inputmode="numeric" placeholder="------"
+                   class="w-full text-center tracking-widest text-2xl px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
+            <button id="btn-totp"
+              class="mt-3 px-5 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition">
+              Verify Code & Sign In
+            </button>
+            <p class="text-xs text-gray-400 mt-2">
+              Haven’t set up TOTP yet?
+              <a href="{% url 'accounts:setup_totp' %}" class="text-blue-600 hover:underline">Set it up here</a>.
+            </p>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Setup ---------- */
+function getCookie(name) {
+  const v = `; ${document.cookie}`.split(`; ${name}=`); 
+  if (v.length === 2) return v.pop().split(';').shift();
+}
+const CSRF = getCookie('csrftoken');
+const urls = {
+  face: "{% url 'accounts:login_face' %}",
+  pass: "{% url 'accounts:verify_password' %}",
+  totp: "{% url 'accounts:verify_totp' %}",
+  done: "{% url 'accounts:dashboard' %}"
+};
+
+const ui = {
+  slides: document.getElementById('slides'),
+  msg: document.getElementById('msg'),
+  dotFace: document.getElementById('dot-face'),
+  dotPass: document.getElementById('dot-pass'),
+  dotTotp: document.getElementById('dot-totp'),
+  live: document.getElementById('live'),
+  btnFace: document.getElementById('btn-face'),
+  btnPass: document.getElementById('btn-pass'),
+  btnTotp: document.getElementById('btn-totp'),
+  pwd: document.getElementById('password'),
+  totp: document.getElementById('totp'),
+};
+
+/* ---------- Navigation ---------- */
+let step = 0;
+function go(n) {
+  step = n;
+  ui.slides.style.transform = `translateX(-${n * 100}%)`;
+  ui.dotFace.className = 'w-10 h-10 rounded-full flex items-center justify-center ' +
+    (n === 0 ? 'bg-blue-600 text-white shadow' : 'bg-blue-600 text-white');
+  ui.dotPass.className = 'w-10 h-10 rounded-full flex items-center justify-center ' +
+    (n >= 1 ? (n === 1 ? 'bg-blue-600 text-white shadow' : 'bg-blue-600 text-white') : 'bg-gray-200 text-gray-600');
+  ui.dotTotp.className = 'w-10 h-10 rounded-full flex items-center justify-center ' +
+    (n >= 2 ? 'bg-blue-600 text-white shadow' : 'bg-gray-200 text-gray-600');
+}
+
+/* ---------- Alerts ---------- */
+function flash(type, text) {
+  const base = "mt-6 rounded-lg px-4 py-3 text-sm font-medium ";
+  const map = {
+    info: "bg-blue-50 text-blue-800 border border-blue-200",
+    ok:   "bg-green-50 text-green-800 border border-green-200",
+    warn: "bg-yellow-50 text-yellow-800 border border-yellow-200",
+    err:  "bg-red-50 text-red-800 border border-red-200",
+  };
+  ui.msg.className = base + (map[type] || map.info);
+  ui.msg.textContent = text;
+  ui.msg.classList.remove('hidden');
+  setTimeout(() => ui.msg.classList.add('hidden'), 4000);
+}
+
+/* ---------- Camera ---------- */
+let stream;
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    ui.live.srcObject = stream;
+  } catch (e) {
+    flash('err', 'Camera access denied.');
+  }
+}
+function snapPng() {
+  const v = ui.live;
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth || 640;
+  c.height = v.videoHeight || 480;
+  c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  return c.toDataURL('image/png');
+}
+
+/* ---------- AJAX Helper ---------- */
+async function postForm(url, data) {
+  const body = new URLSearchParams(data);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-CSRFToken": CSRF,
+      "X-Requested-With": "XMLHttpRequest",
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body
+  });
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    throw new Error("Expected JSON but got HTML — update your Django view to return JsonResponse.");
+  }
+  return res.json();
+}
+
+/* ---------- Step 1: Face ---------- */
+ui.btnFace.addEventListener('click', async () => {
+  const shot = snapPng();
+  if (!shot) return flash('err', 'Could not capture image.');
+  ui.btnFace.disabled = true;
+  flash('info', 'Verifying face…');
+  try {
+    const data = await postForm(urls.face, { captured_image: shot });
+    console.log("Face:", data);
+    if (data.ok) {
+      flash('ok', 'Face verified successfully.');
+      go(1);
+      ui.pwd.focus();
+    } else flash('err', data.error || 'Face not recognized.');
+  } catch (e) { flash('err', e.message); }
+  ui.btnFace.disabled = false;
+});
+
+/* ---------- Step 2: Password ---------- */
+ui.btnPass.addEventListener('click', async () => {
+  const pw = ui.pwd.value.trim();
+  if (!pw) return flash('warn', 'Please enter password.');
+  ui.btnPass.disabled = true;
+  flash('info', 'Verifying password…');
+  try {
+    const data = await postForm(urls.pass, { password: pw });
+    if (data.ok) {
+      flash('ok', 'Password verified.');
+      go(2);
+      ui.totp.focus();
+    } else flash('err', data.error || 'Incorrect password.');
+  } catch (e) { flash('err', e.message); }
+  ui.btnPass.disabled = false;
+});
+
+/* ---------- Step 3: TOTP ---------- */
+ui.btnTotp.addEventListener('click', async () => {
+  const code = ui.totp.value.replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(code)) return flash('warn', 'Enter the 6-digit code.');
+  ui.btnTotp.disabled = true;
+  flash('info', 'Verifying code…');
+  try {
+    const data = await postForm(urls.totp, { token: code });
+    if (data.ok) {
+      flash('ok', 'All checks passed. Redirecting…');
+      window.location.replace(urls.done);
+    } else flash('err', data.error || 'Invalid code.');
+  } catch (e) { flash('err', e.message); }
+  ui.btnTotp.disabled = false;
+});
+
+/* ---------- Init ---------- */
+startCamera();
+go(0);
+</script>
+{% endblock %}

@@ -1,0 +1,341 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Banking Dashboard{% endblock %}
+
+{% block content %}
+<style>
+:root {
+  --card-bg: rgba(255,255,255,0.85);
+  --muted: #6b7280;
+  --glass-border: rgba(255,255,255,0.6);
+}
+
+body {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+.dashboard-wrap {
+  max-width: 1200px;
+  margin: 1.5rem auto;
+  padding: 1rem;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.card {
+  background: var(--card-bg);
+  backdrop-filter: blur(8px) saturate(120%);
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 6px 18px rgba(20,30,60,0.06);
+  padding: 1.25rem;
+  transition: all 0.2s ease;
+}
+.card:hover { transform: translateY(-4px); }
+
+.summary-grid {
+  display: grid;
+  gap: 1rem;
+}
+@media (min-width: 768px) {
+  .summary-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.summary-title { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+.summary-amount { font-size: 1.9rem; font-weight: 700; margin-top: 0.35rem; }
+
+.txn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  color: #111827;
+}
+.txn-table thead th {
+  text-align: left;
+  padding: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  background: linear-gradient(180deg, #fbfdff, #f8fafc);
+  border-bottom: 1px solid rgba(15,23,42,0.04);
+}
+.txn-table tbody tr td {
+  padding: 0.75rem;
+  border-bottom: 1px solid rgba(15,23,42,0.04);
+}
+.txn-row:hover { background: #fbfdff; }
+
+.actions-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+@media (min-width: 768px) {
+  .actions-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.action-button {
+  padding: 1.25rem;
+  font-weight: 600;
+  font-size: 1.02rem;
+  border-radius: 12px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(15,23,42,0.04);
+}
+.status-dot { width: 12px; height: 12px; border-radius: 999px; }
+.status-verified { background: #10b981; }
+.status-invalid { background: #ef4444; }
+.status-pending { background: #f59e0b; }
+
+.muted { color: var(--muted); font-size: 0.95rem; }
+a.small-link { color: #374151; text-decoration: underline; font-weight: 600; }
+</style>
+
+<div class="dashboard-wrap">
+  <!-- Greeting -->
+  <div class="top-row">
+    <div>
+      <h1 style="font-size:1.85rem; font-weight:800; margin:0;">
+        Hello, {{ user.first_name|default:user.username|capfirst }} 👋
+      </h1>
+      <p class="muted" style="margin:0;">Last login: {{ user.last_login|date:"d M Y, h:i A" }}</p>
+    </div>
+    <div style="display:flex; gap:0.75rem; align-items:center;">
+      <a href="{% url 'accounts:transfers' %}" class="small-link">View Statements</a>
+      <button id="openTransferModal" class="card" 
+              style="padding:0.6rem 1rem; background:linear-gradient(90deg,#3b82f6,#7c3aed);
+                     color:white; border:none; border-radius:10px; cursor:pointer;">
+        + New Transfer
+      </button>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="card">
+      <div class="summary-title">Total Balance</div>
+      <div class="summary-amount" style="color:#059669;">₹{{ balance|default:"0.00" }}</div>
+      <p class="muted" style="margin-top:0.6rem;">Net Available Balance</p>
+    </div>
+    <div class="card">
+      <div class="summary-title">Total Income</div>
+      <div class="summary-amount" style="color:#2563eb;">₹{{ total_credit|default:"0.00" }}</div>
+      <p class="muted" style="margin-top:0.6rem;">All credits received</p>
+    </div>
+    <div class="card">
+      <div class="summary-title">Total Spent</div>
+      <div class="summary-amount" style="color:#ef4444;">₹{{ total_debit|default:"0.00" }}</div>
+      <p class="muted" style="margin-top:0.6rem;">All debits processed</p>
+    </div>
+  </div>
+
+  <!-- Transactions -->
+  <div style="display:grid; gap:1rem; margin-top:1rem;">
+    <div class="card">
+      <h2 style="margin:0 0 0.6rem 0; font-size:1.15rem; font-weight:700;">Recent Transactions</h2>
+      {% if transactions %}
+      <div style="overflow-x:auto;">
+        <table class="txn-table">
+          <thead>
+            <tr>
+              <th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for txn in transactions %}
+            <tr class="txn-row">
+              <td>{{ txn.created_at|date:"d M Y" }}</td>
+              <td>{{ txn.description }}</td>
+              <td>{{ txn.transaction_type }}</td>
+              <td>
+                {% if txn.transaction_type == 'debit' %}-{% else %}+{% endif %}
+                ₹{{ txn.amount }}
+              </td>
+              <td style="color:{% if txn.status == 'Completed' %}#10b981{% else %}#f59e0b{% endif %};">
+                {{ txn.status }}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted">No transactions yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Camera Card -->
+    <div class="card" style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem;">
+      <!-- Square Video -->
+      <div style="flex:0 0 auto; width:260px; height:260px; border-radius:12px; overflow:hidden; border:1px solid rgba(0,0,0,0.08); background:#000; position:relative;">
+        <video id="faceStream" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover; border-radius:12px;"></video>
+        <div id="faceBorder" style="position:absolute; inset:0; border-radius:12px; border:3px solid transparent; pointer-events:none; transition:border-color 0.3s ease;"></div>
+      </div>
+
+      <!-- Info Section -->
+      <div style="flex:1; min-width:220px; display:flex; flex-direction:column; gap:0.8rem;">
+        <div>
+          <h3 style="margin:0; font-weight:700;">Live Face Verification</h3>
+          <p class="muted" style="margin:0.2rem 0 0;">System verifies every second</p>
+        </div>
+
+        <div id="facePill" class="status-pill" style="align-self:flex-start;">
+          <span id="faceDot" class="status-dot status-pending"></span>
+          <span id="statusText">Initializing...</span>
+        </div>
+
+        <button id="toggleCamera"
+                style="align-self:flex-start; padding:0.6rem 0.9rem; background:#efefef;
+                       color:#111827; border:1px solid rgba(0,0,0,0.04); border-radius:10px; cursor:pointer;">
+          Toggle Camera
+        </button>
+
+        <p class="muted" style="margin:0.4rem 0 0;">If mismatch occurs 3×, you’ll be logged out for safety.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="actions-grid">
+    <a href="{% url 'accounts:logout' %}" class="action-button" style="background:linear-gradient(90deg,#ef4444,#b91c1c); color:white;">🚪 Logout</a>
+    <a href="{% url 'accounts:transfers' %}" class="action-button" style="background:linear-gradient(90deg,#10b981,#06b6d4); color:white;">📊 View Statements</a>
+    <a href="{% url 'accounts:settings' %}" class="action-button" style="background:linear-gradient(90deg,#8b5cf6,#ec4899); color:white;">⚙️ Manage Account</a>
+  </div>
+</div>
+
+{% include "accounts/_transfer_modal.html" %}
+
+<script>
+/* ---------- Modal Safe Init ---------- */
+(function() {
+  const open1 = document.getElementById('openTransferModal');
+  const open2 = document.getElementById('openTransferModal2');
+  if (!window.transferModal) {
+    window.transferModal = document.getElementById('transferModal');
+  }
+  [open1, open2].forEach(btn => {
+    if (btn && window.transferModal) {
+      btn.addEventListener('click', () => window.transferModal.classList.remove('hidden'));
+    }
+  });
+})();
+
+/* ---------- Continuous Face Verification (Every 1s) ---------- */
+const video = document.getElementById("faceStream");
+const faceDot = document.getElementById("faceDot");
+const statusText = document.getElementById("statusText");
+const toggleBtn = document.getElementById("toggleCamera");
+const faceBorder = document.getElementById("faceBorder");
+
+let stream = null;
+let useFront = true;
+let failureCount = 0;
+let intervalId = null;
+
+function setStatus(state, msg) {
+  faceDot.className = 'status-dot';
+  faceBorder.style.borderColor = 'transparent';
+  if (state === 'verified') {
+    faceDot.classList.add('status-verified');
+    faceBorder.style.borderColor = '#10b981';
+  } else if (state === 'invalid') {
+    faceDot.classList.add('status-invalid');
+    faceBorder.style.borderColor = '#ef4444';
+  } else {
+    faceDot.classList.add('status-pending');
+  }
+  statusText.textContent = msg;
+}
+
+async function startCamera() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    const constraints = { video: { facingMode: useFront ? "user" : "environment" } };
+    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    video.srcObject = stream;
+    await new Promise(res => (video.onloadedmetadata = res));
+    video.play();
+    setStatus('pending', 'Camera active');
+  } catch (err) {
+    console.error('Camera error:', err);
+    setStatus('invalid', 'Camera access denied');
+  }
+}
+
+async function verifyFrame() {
+  if (!video.videoWidth) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const captured_image = canvas.toDataURL('image/png');
+
+  try {
+    const res = await fetch("{% url 'accounts:reverify_face' %}", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ captured_image }),
+    });
+    const data = await res.json();
+
+    if (data.status === "valid") {
+      failureCount = 0;
+      setStatus('verified', 'Verified');
+    } else if (data.status === "invalid") {
+      failureCount++;
+      setStatus('invalid', `Mismatch #${failureCount}`);
+      if (failureCount >= 3) {
+        setStatus('invalid', 'Logging out...');
+        setTimeout(() => window.location.href = "{% url 'accounts:logout' %}", 1500);
+      }
+    } else {
+      setStatus('invalid', 'Verification error');
+    }
+  } catch (err) {
+    console.error('Verification error:', err);
+    setStatus('invalid', 'Server error');
+  }
+}
+
+function startContinuousVerification() {
+  if (intervalId) clearInterval(intervalId);
+  verifyFrame();
+  intervalId = setInterval(verifyFrame, 1000);
+}
+
+toggleBtn.addEventListener('click', () => {
+  useFront = !useFront;
+  startCamera();
+});
+
+startCamera().then(() => setTimeout(startContinuousVerification, 800));
+
+window.addEventListener('beforeunload', () => {
+  if (intervalId) clearInterval(intervalId);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+});
+</script>
+{% endblock %}

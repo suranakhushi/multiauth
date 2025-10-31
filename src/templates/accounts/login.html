@@ -1,0 +1,244 @@
+{% extends "../base.html" %}
+{% load static %}
+{% block title %}Secure Web App for Banking{% endblock %}
+
+{% block head %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(to bottom right, #2c3e50, #1a202c);
+    overflow-x: hidden;
+    color: #f3f4f6;
+}
+
+/* ===== Landing Section ===== */
+.landing-section {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: 2rem;
+}
+
+/* ===== Background Animation ===== */
+.bg-animated {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.3), transparent 70%),
+                radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.2), transparent 70%),
+                url('https://images.unsplash.com/photo-1605902711622-cfb43c4437b4?auto=format&fit=crop&w=1950&q=80') center/cover no-repeat;
+    z-index: 0;
+    filter: brightness(0.5);
+    animation: pulse 12s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); filter: brightness(0.55); }
+    100% { transform: scale(1.05); filter: brightness(0.65); }
+}
+
+/* ===== Glass Card ===== */
+.landing-card {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 850px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 1.5rem;
+    padding: 3rem 2rem;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    animation: fadeUp 1s ease forwards;
+    opacity: 0;
+    transform: translateY(40px);
+}
+
+@keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.landing-card h1 {
+    font-size: 2.3rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 1rem;
+}
+
+.landing-card p {
+    color: #d1d5db;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    line-height: 1.8rem;
+}
+
+/* ===== Button ===== */
+#loginCaptureBtn {
+    padding: 0.9rem 2.8rem;
+    border: none;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #2563eb, #10b981);
+    color: white;
+    font-size: 1.05rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+    transition: all 0.3s ease;
+}
+
+#loginCaptureBtn:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.9);
+}
+
+/* ===== Image ===== */
+.landing-img {
+    margin-top: 2rem;
+    display: flex;
+    justify-content: center;
+}
+
+.landing-img img {
+    max-width: 280px;
+    border-radius: 1rem;
+    box-shadow: 0 0 30px rgba(37, 99, 235, 0.6);
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+/* ===== Floating Message Box ===== */
+.message-box {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 300px;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    text-align: center;
+    opacity: 0;
+    z-index: 999;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    pointer-events: none;
+}
+
+.message-box.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.message-success {
+    background: rgba(16, 185, 129, 0.95);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);
+}
+
+.message-error {
+    background: rgba(239, 68, 68, 0.95);
+    color: #fff;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+    .landing-card {
+        padding: 2rem 1.5rem;
+    }
+    .landing-card h1 {
+        font-size: 2rem;
+    }
+    #loginCaptureBtn {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="landing-section">
+  <div class="bg-animated"></div>
+
+  <div class="landing-card">
+    <h1>Secure Web App for Banking</h1>
+    <p>
+      Experience next-level protection with <strong>three-factor authentication</strong> — face, token, and password.
+      Your banking experience, now more secure and intelligent.
+    </p>
+
+    <div id="msgBox" class="message-box"></div>
+
+    <form method="POST" action="{% url 'accounts:login_face' %}">
+      {% csrf_token %}
+      <input type="hidden" name="captured_image" id="loginCapturedImageInput">
+      <button type="button" id="loginCaptureBtn">Get Started</button>
+    </form>
+
+    <div class="landing-img">
+      <img src="{% static 'icons/3562336.png' %}" alt="illustration">
+    </div>
+  </div>
+</section>
+
+<script>
+const captureBtn = document.getElementById('loginCaptureBtn');
+const capturedInput = document.getElementById('loginCapturedImageInput');
+const msgBox = document.getElementById('msgBox');
+
+// Display Django messages
+window.addEventListener('DOMContentLoaded', () => {
+  {% if messages %}
+    {% for message in messages %}
+      showMessage("{{ message }}", "{{ message.tags }}");
+    {% endfor %}
+  {% endif %}
+});
+
+captureBtn.addEventListener('click', async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    const track = stream.getVideoTracks()[0];
+    const imageCapture = new ImageCapture(track);
+    const bitmap = await imageCapture.grabFrame();
+
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0);
+
+    capturedInput.value = canvas.toDataURL('image/png');
+    track.stop();
+
+    if (!capturedInput.value.startsWith('data:image/')) {
+      showMessage('No face detected. Please try again.', 'error');
+      return;
+    }
+
+    captureBtn.closest('form').submit();
+  } catch (err) {
+    showMessage('Camera access failed or face not detected: ' + err.message, 'error');
+  }
+});
+
+function showMessage(text, type) {
+  msgBox.textContent = text;
+  msgBox.className = 'message-box show ' + (type === 'success' ? 'message-success' : 'message-error');
+  setTimeout(() => {
+    msgBox.className = 'message-box';
+  }, 4000);
+}
+</script>
+{% endblock %}

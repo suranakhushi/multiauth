@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Contact | Secure Web App{% endblock %}
+{% block head %}
+<style>
+  body {
+    background: radial-gradient(circle at top right, rgba(108, 99, 255, 0.2), rgba(0, 0, 0, 0.9)),
+                url('https://images.unsplash.com/photo-1605902711622-cfb43c4437d2?auto=format&fit=crop&w=1950&q=80');
+    background-size: cover;
+    background-position: center;
+    color: white;
+  }
+
+  .contact-container {
+    min-height: calc(100vh - 80px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1.5rem;
+    backdrop-filter: blur(5px);
+  }
+
+  .contact-container h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(108,99,255,0.8);
+    margin-bottom: 2rem;
+  }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  .contact-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    padding: 2rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    backdrop-filter: blur(8px);
+  }
+
+  .contact-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 0 20px rgba(108, 99, 255, 0.5);
+  }
+
+  .contact-name {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #fff;
+  }
+
+  .contact-role {
+    font-size: 1rem;
+    color: #ccc;
+  }
+
+  .contact-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: var(--secondary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="contact-container">
+  <h1>Contact Our Team</h1>
+  <div class="contact-grid">
+    <div class="contact-card">
+      <div class="contact-icon">👩‍💻</div>
+      <div class="contact-name">SV</div>
+      <div class="contact-role">Technical Lead</div>
+    </div>
+    <div class="contact-card">
+      <div class="contact-icon">🎨</div>
+      <div class="contact-name">KS</div>
+      <div class="contact-role">UI/UX Designer</div>
+    </div>
+    <div class="contact-card">
+      <div class="contact-icon">🧠</div>
+      <div class="contact-name">AD</div>
+      <div class="contact-role">ML Engineer</div>
+    </div>
+    <div class="contact-card">
+      <div class="contact-icon">📢</div>
+      <div class="contact-name">SG</div>
+      <div class="contact-role">Communications</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

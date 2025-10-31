@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}My Website{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #6c63ff;
+      --secondary: #00c9a7;
+      --text: #222;
+      --background: #f9f9ff;
+    }
+
+    * {
+      font-family: 'Poppins', sans-serif;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background-color: var(--background);
+      color: var(--text);
+    }
+
+    /* NAVBAR */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+    }
+
+    nav h1 {
+      font-weight: 600;
+      font-size: 1.4rem;
+      letter-spacing: 1px;
+    }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 1.2rem;
+      margin: 0;
+      padding: 0;
+    }
+
+    nav ul li a {
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+
+    nav ul li a:hover {
+      opacity: 0.8;
+    }
+
+    .btn {
+      padding: 0.6rem 1.2rem;
+      border: none;
+      border-radius: 8px;
+      background-color: white;
+      color: var(--primary);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s, color 0.3s;
+      text-decoration: none;
+    }
+
+    .btn:hover {
+      background-color: var(--secondary);
+      color: white;
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+
+<body>
+  <nav>
+      <h1>
+          <a href="{% url 'accounts:home' %}" style="color: white; text-decoration: none;">
+              Secure Web App
+          </a>
+      </h1>
+    <ul>
+      <li><a href="/accounts/home">Home</a></li>
+      <li><a href="/accounts/about">About</a></li>
+      <li><a href="/accounts/contact">Contact</a></li>
+      <li><a href="{% url 'accounts:login' %}" class="btn">Login</a></li>
+<li><a href="{% url 'accounts:register' %}" class="btn">Register</a></li>
+
+    </ul>
+  </nav>
+
+  {% block content %}{% endblock %}
+</body>
+
+<style>
+  h1 a {
+    transition: opacity 0.3s ease;
+  }
+  h1 a:hover {
+    opacity: 0.8;
+  }
+</style>
+
+</html>

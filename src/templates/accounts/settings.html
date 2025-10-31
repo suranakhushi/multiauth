@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Account Settings{% endblock %}
+
+{% block content %}
+<section class="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-start py-12 px-4">
+
+  <style>
+    /* Container & Card */
+    .settings-card {
+      background: #fff;
+      background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+      color: #111827;
+      max-width: 3xl;
+      width: 100%;
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+    }
+    .settings-card.dark {
+      background: #1f2937;
+      color: #f9fafb;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Headings */
+    .settings-card h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+    .settings-card h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    /* Form Inputs */
+    .settings-input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border-radius: 0.75rem;
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      color: #111827;
+      transition: all 0.2s;
+    }
+    .settings-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+    .dark .settings-input {
+      background: #374151;
+      border-color: #4b5563;
+      color: #f9fafb;
+    }
+
+    /* Labels */
+    .settings-label {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+      display: block;
+      color: #374151;
+    }
+    .dark .settings-label {
+      color: #d1d5db;
+    }
+
+    /* Grid Layout */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+    @media(min-width: 768px) {
+      .settings-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Buttons */
+    .settings-btn {
+      background: linear-gradient(90deg, #3b82f6, #6366f1);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .settings-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 15px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Section Titles */
+    .section-title {
+      font-weight: 700;
+      font-size: 1.2rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+      color: #1f2937;
+    }
+    .dark .section-title {
+      color: #f9fafb;
+    }
+  </style>
+
+  <!-- Settings Card -->
+  <div class="settings-card dark:dark">
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1>⚙️ Account Settings</h1>
+      <p class="text-gray-500 dark:text-gray-400 text-sm">Manage your personal information and security settings</p>
+    </div>
+
+    <!-- Form -->
+    <form method="POST">
+      {% csrf_token %}
+
+      <div class="settings-grid">
+        <div>
+          <label class="settings-label">First Name</label>
+          <input type="text" name="first_name" value="{{ user.first_name }}" class="settings-input">
+        </div>
+
+        <div>
+          <label class="settings-label">Last Name</label>
+          <input type="text" name="last_name" value="{{ user.last_name }}" class="settings-input">
+        </div>
+
+        <div>
+          <label class="settings-label">Email</label>
+          <input type="email" name="email" value="{{ user.email }}" class="settings-input">
+        </div>
+
+        <div>
+          <label class="settings-label">Phone Number</label>
+          <input type="text" name="phone_number" value="{{ user.profile.phone_number|default:'' }}" class="settings-input">
+        </div>
+      </div>
+
+      <!-- Password Section -->
+      <h2 class="section-title">Change Password</h2>
+      <div class="settings-grid">
+        <div>
+          <label class="settings-label">New Password</label>
+          <input type="password" name="password1" class="settings-input">
+        </div>
+        <div>
+          <label class="settings-label">Confirm Password</label>
+          <input type="password" name="password2" class="settings-input">
+        </div>
+      </div>
+
+      <!-- Submit Button -->
+      <div class="mt-8 text-center">
+        <button type="submit" class="settings-btn">Save Changes</button>
+      </div>
+
+    </form>
+  </div>
+
+</section>
+{% endblock %}

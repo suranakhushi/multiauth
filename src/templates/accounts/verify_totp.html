@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Verify TOTP{% endblock %}
+
+{% block head %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+body {
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(135deg, #f0f4f8, #dbeafe);
+    color: #111827;
+    overflow-x: hidden;
+}
+
+/* Main container */
+.landing-section {
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 6rem 1rem 2rem 1rem;
+    position: relative;
+}
+
+/* Card */
+.landing-card {
+    position: relative;
+    z-index: 10;
+    max-width: 450px;
+    width: 100%;
+    background: rgba(255,255,255,0.9);
+    border-radius: 2rem;
+    padding: 3rem 2rem;
+    text-align: center;
+    box-shadow: 0 15px 50px rgba(0,0,0,0.1);
+    backdrop-filter: blur(10px);
+    animation: fadeInUp 1s ease forwards;
+    opacity: 0;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    0% { opacity: 0; transform: translateY(40px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Title */
+.landing-card h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: #1e293b;
+}
+
+/* Input fields */
+.landing-card input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #1e293b;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.landing-card input:focus {
+    border-color: #3b82f6;
+    background: #fff;
+    outline: none;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+}
+
+/* Button */
+.landing-card button {
+    width: 100%;
+    padding: 0.95rem 1rem;
+    font-weight: 600;
+    border-radius: 50px;
+    border: none;
+    background: linear-gradient(135deg, #3b82f6, #6c63ff);
+    color: white;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 0 15px rgba(108, 99, 255, 0.4);
+}
+
+.landing-card button:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 0 30px rgba(108, 99, 255, 0.6);
+}
+
+/* Floating messages */
+.message-box {
+    position: absolute;
+    top: -70px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.8rem 2rem;
+    border-radius: 1rem;
+    font-weight: 600;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.5s ease;
+    z-index: 20;
+}
+
+.message-success { background: rgba(16, 185, 129, 0.9); color: #fff; }
+.message-error { background: rgba(239, 68, 68, 0.9); color: #fff; }
+
+.message-box.show { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="landing-section">
+    <div class="landing-card">
+        <div id="msgBox" class="message-box"></div>
+        <h1>Verify Authentication Code</h1>
+        <p class="mb-6 text-gray-600">Enter your 6-digit authentication code to continue securely.</p>
+
+        <form method="POST">
+            {% csrf_token %}
+            <input type="text" name="token" maxlength="6" placeholder="Enter 6-digit code" required>
+            <button type="submit">Verify Code</button>
+        </form>
+    </div>
+</section>
+
+<script>
+const msgBox = document.getElementById('msgBox');
+
+// Example: show error if code invalid (replace with backend logic)
+function showMessage(text, type) {
+    msgBox.textContent = text;
+    msgBox.className = 'message-box show ' + (type === 'success' ? 'message-success' : 'message-error');
+    setTimeout(() => { msgBox.className = 'message-box'; }, 3500);
+}
+
+// Optional: example usage
+{% if error %}
+showMessage("{{ error }}", "error");
+{% endif %}
+{% if success %}
+showMessage("{{ success }}", "success");
+{% endif %}
+</script>
+{% endblock %}

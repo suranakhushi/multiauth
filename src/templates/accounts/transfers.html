@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}All Transfers{% endblock %}
+
+{% block content %}
+<style>
+/* Container card */
+.transfers-card {
+    background-color: #ffffff;
+    color: #1e293b;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+.dark .transfers-card {
+    background-color: #1f2937;
+    color: #e5e7eb;
+}
+
+/* Table styles */
+.transfers-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 600px;
+}
+
+.transfers-table thead tr {
+    background-color: #f3f4f6;
+    color: #1e293b;
+    font-weight: 600;
+}
+.dark .transfers-table thead tr {
+    background-color: #374151;
+    color: #f3f4f6;
+}
+
+.transfers-table th,
+.transfers-table td {
+    padding: 0.75rem 1rem;
+}
+
+.transfers-table th {
+    text-align: left;
+}
+
+.transfers-table td.text-center {
+    text-align: center;
+}
+
+.transfers-table tr {
+    transition: all 0.2s ease;
+}
+
+.transfers-table tr:hover {
+    background-color: #e0f2fe;
+}
+.dark .transfers-table tr:hover {
+    background-color: #374151;
+}
+
+/* Alternating row colors */
+.transfers-table tbody tr:nth-child(odd) {
+    background-color: #f9fafb;
+}
+.dark .transfers-table tbody tr:nth-child(odd) {
+    background-color: #1f2937;
+}
+
+.transfers-table tbody tr:nth-child(even) {
+    background-color: #ffffff;
+}
+.dark .transfers-table tbody tr:nth-child(even) {
+    background-color: #111827;
+}
+
+/* Status colors */
+.status-completed {
+    color: #16a34a; /* green */
+    font-weight: 600;
+}
+.status-pending {
+    color: #facc15; /* yellow */
+    font-weight: 600;
+}
+
+/* Amount colors */
+.amount-debit {
+    color: #ef4444; /* red */
+    font-weight: 600;
+}
+.amount-credit {
+    color: #10b981; /* green */
+    font-weight: 600;
+}
+</style>
+
+<section class="p-10 bg-gray-50 dark:bg-gray-900 min-h-screen">
+  <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white mb-6">📤 All Transfers</h1>
+
+  {% if transactions %}
+  <div class="transfers-card overflow-x-auto rounded-xl">
+    <table class="transfers-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Type</th>
+          <th class="text-center">Amount</th>
+          <th class="text-center">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for txn in transactions %}
+        <tr>
+          <td>{{ txn.created_at|date:"d M Y" }}</td>
+          <td>{{ txn.description }}</td>
+          <td class="capitalize">{{ txn.transaction_type }}</td>
+          <td class="text-center {% if txn.transaction_type == 'debit' %}amount-debit{% else %}amount-credit{% endif %}">
+            {% if txn.transaction_type == 'debit' %}-{% else %}+{% endif %} ₹{{ txn.amount }}
+          </td>
+          <td class="text-center {% if txn.status == 'Completed' %}status-completed{% else %}status-pending{% endif %}">
+            {{ txn.status }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="text-gray-500 dark:text-gray-400 italic mt-6">No transfers found yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
